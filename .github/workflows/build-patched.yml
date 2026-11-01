@@ -54,18 +54,38 @@ jobs:
 
           cd ..
 
-          # 2. Clone sibling repos and apply patches
-          git clone https://github.com/starifly/libneko libneko
-          cd libneko && git checkout 6a85c185d62435a5293ef70ac3b638ae3ee1efa7 && git apply ../repo/patches/libneko.patch && cd ..
+          # 2. Clone sibling repos and apply patches (subshells so a failure never leaves us in the wrong dir)
+          (
+            git clone https://github.com/starifly/libneko libneko
+            cd libneko
+            git fetch origin 6a85c185d62435a5293ef70ac3b638ae3ee1efa7
+            git checkout FETCH_HEAD
+            git apply ../repo/patches/libneko.patch
+          )
 
-          git clone https://github.com/masterking32/MasterDnsVPN MasterDnsVPN-plus
-          cd MasterDnsVPN-plus && git checkout 7de2476f1c33e69eec35360c52810dab43c5c986 && git apply ../repo/patches/MasterDnsVPN.patch && cd ..
+          (
+            git clone https://github.com/masterking32/MasterDnsVPN MasterDnsVPN-plus
+            cd MasterDnsVPN-plus
+            git fetch origin 7de2476f1c33e69eec35360c52810dab43c5c986
+            git checkout FETCH_HEAD
+            git apply ../repo/patches/MasterDnsVPN.patch
+          )
 
-          git clone https://github.com/starifly/sing-box sing-box
-          cd sing-box && git checkout 7054cac5124465ffdb145870d7c01885566711b1 && git apply ../repo/patches/sing-box.patch && cd ..
+          (
+            git clone https://github.com/starifly/sing-box sing-box
+            cd sing-box
+            git fetch origin 7054cac5124465ffdb145870d7c01885566711b1
+            git checkout FETCH_HEAD
+            git apply ../repo/patches/sing-box.patch
+          )
 
-          git clone https://github.com/starifly/sing-vmess sing-vmess
-          cd sing-vmess && git checkout 887f058c04c5b86d88188acc32093d0d62f53b6c && git apply ../repo/patches/sing-vmess.patch && cd ..
+          (
+            git clone https://github.com/starifly/sing-vmess sing-vmess
+            cd sing-vmess
+            git fetch origin 887f058c04c5b86d88188acc32093d0d62f53b6c
+            git checkout FETCH_HEAD
+            git apply ../repo/patches/sing-vmess.patch
+          )
 
       - name: Build Native Core & Assets
         run: |
