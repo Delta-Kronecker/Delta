@@ -99,6 +99,27 @@ jobs:
             git apply ../repo/patches/sing-vmess.patch
           )
 
+          # sing-box go.mod replaces these; patches live in sing-box/patches
+          (
+            git clone --branch v3.1.20260814 https://github.com/amnezia-vpn/amneziawg-go amneziawg-go
+            cd amneziawg-go
+            for p in ../sing-box/patches/amneziawg-go/*.patch; do
+              git apply "$p"
+            done
+          )
+
+          (
+            git clone https://github.com/metacubex/utls utls
+            cd utls
+            git fetch origin f7d52c22f3a8d2f510ad1470f75cb6c3fe26aa37
+            git checkout FETCH_HEAD
+            git apply ../sing-box/patches/utls/0001-utls-new-fingerprints.patch
+          )
+
+          # embed.go references this file, but the patch only edits .gitignore for it
+          mkdir -p sing-box/common/adblock/adblockrust/resources/files
+          touch sing-box/common/adblock/adblockrust/resources/files/placeholder.txt
+
       - name: Build Native Core & Assets
         run: |
           cd NekoBoxForAndroid
