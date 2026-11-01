@@ -1,0 +1,85 @@
+name: Build Patched NekoBox
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current repository (with patches)
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Checkout NekoBoxForAndroid
+        uses: actions/checkout@v4
+        with:
+          repository: starifly/NekoBoxForAndroid
+          ref: 5bb4786de6864c039a889f71db54cc914ce46e15
+          path: NekoBoxForAndroid
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.5'
+
+      - name: Setup Android NDK
+        uses: nsetup/setup-ndk@v1
+        with:
+          ndk-version: r27c
+
+      - name: Apply Patches & Setup Sibling Repositories
+        run: |
+          # 1. Apply patch to NekoBoxForAndroid
+          cd NekoBoxForAndroid
+          git apply ../repo/patches/NekoBoxForAndroid.patch
+
+          sed -i 's|{sing-box-repo-here}|https://github.com/starifly/sing-box.git|g' buildScript/lib/core/get_source.sh
+          sed -i 's|{sing-vmess-repo-here}|https://github.com/starifly/sing-vmess.git|g' buildScript/lib/core/get_source.sh
+          sed -i 's|{libneko-repo-here}|https://github.com/starifly/libneko.git|g' buildScript/lib/core/get_source.sh
+
+          cd ..
+
+          # 2. Clone sibling repos and apply patches
+          git clone https://github.com/starifly/libneko libneko
+          cd libneko && git checkout 6a85c185d62435a5293ef70ac3b638ae3ee1efa7 && git apply ../repo/patches/libneko.patch && cd ..
+
+          git clone https://github.com/masterking32/MasterDnsVPN MasterDnsVPN-plus
+          cd MasterDnsVPN-plus && git checkout 7de2476f1c33e69eec35360c52810dab43c5c986 && git apply ../repo/patches/MasterDnsVPN.patch && cd ..
+
+          git clone https://github.com/starifly/sing-box sing-box
+          cd sing-box && git checkout 7054cac5124465ffdb145870d7c01885566711b1 && git apply ../repo/patches/sing-box.patch && cd ..
+
+          git clone https://github.com/starifly/sing-vmess sing-vmess
+          cd sing-vmess && git checkout 887f058c04c5b86d88188acc32093d0d62f53b6c && git apply ../repo/patches/sing-vmess.patch && cd ..
+
+      - name: Build Native Core & Assets
+        run: |
+          cd NekoBoxForAndroid
+          bash buildScript/lib/assets.sh
+          ./run lib core
+
+      - name: Build Android APK
+        run: |
+          cd NekoBoxForAndroid
+          chmod +x gradlew
+          ./gradlew assembleOssRelease
+
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NekoBox-Patched-APKs
+          path: NekoBoxForAndroid/app/build/outputs/apk/
