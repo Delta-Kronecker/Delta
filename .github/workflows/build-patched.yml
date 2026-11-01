@@ -130,7 +130,7 @@ jobs:
         run: |
           cd NekoBoxForAndroid
           chmod +x gradlew
-          ./gradlew assembleOssRelease
+          ./gradlew assembleOssDebug
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
