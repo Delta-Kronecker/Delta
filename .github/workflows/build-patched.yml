@@ -37,9 +37,10 @@ jobs:
           go-version: '1.26.5'
 
       - name: Setup Android NDK
-        uses: nsetup/setup-ndk@v1
-        with:
-          ndk-version: r27c
+        run: |
+          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.0.12077973"
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/27.0.12077973" >> $GITHUB_ENV
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/27.0.12077973" >> $GITHUB_ENV
 
       - name: Apply Patches & Setup Sibling Repositories
         run: |
