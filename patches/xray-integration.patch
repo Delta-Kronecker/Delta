@@ -35,7 +35,7 @@ index 196e7e9..1633522 100644
 +
 +}
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
-index 43d12a8..dd9cff1 100644
+index 43d12a8..4f6da84 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
 @@ -285,7 +285,9 @@ class BaseService {
@@ -93,11 +93,11 @@ index 43d12a8..dd9cff1 100644
                          runBlocking {
                              proxy.looper?.pauseUpdates {
 -                                proxy.box.selectOutbound(tag)
-+                                if (!proxy.xrayMode) proxy.box.selectOutbound(tag)
++                                if (!proxy.xrayMode) proxy.box!!.selectOutbound(tag)
                                  resetCoreNetwork()
                              } ?: run {
 -                                proxy.box.selectOutbound(tag)
-+                                if (!proxy.xrayMode) proxy.box.selectOutbound(tag)
++                                if (!proxy.xrayMode) proxy.box!!.selectOutbound(tag)
                                  resetCoreNetwork()
                              }
                          }
@@ -128,7 +128,7 @@ index 43d12a8..dd9cff1 100644
 -                    Libcore.resetAllConnections(true)
 +                if (!proxy.xrayMode) {
 +                    runCatching {
-+                        proxy.box.resetNetwork()
++                        proxy.box!!.resetNetwork()
 +                    }.onFailure {
 +                        Logs.w(it)
 +                        Libcore.resetAllConnections(true)
@@ -142,7 +142,7 @@ index 43d12a8..dd9cff1 100644
                      if (data.proxy === proxy && data.state.started) {
 -                        if (idle) proxy.box.sleep() else proxy.box.wake()
 +                        if (!proxy.xrayMode) {
-+                            if (idle) proxy.box.sleep() else proxy.box.wake()
++                            if (idle) proxy.box!!.sleep() else proxy.box!!.wake()
 +                        }
                      }
                  },
