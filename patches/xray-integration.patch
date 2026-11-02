@@ -166,7 +166,7 @@ index 3c072a0..2ec5eda 100644
              TProxyManager.request("prepare", captureConfig)
              super.startProcesses()
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
-index e24d5e7..8166a5f 100644
+index e24d5e7..f6763d0 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
 @@ -33,10 +33,10 @@ internal fun ConfigBuildResult.normalizeConfig() =
@@ -191,7 +191,12 @@ index e24d5e7..8166a5f 100644
  
      protected fun initPlugin(name: String): PluginManager.InitResult = pluginPath.getOrPut(name) { PluginManager.init(name)!! }
  
-@@ -214,7 +214,7 @@ abstract class BoxInstance(
+@@ -210,11 +210,11 @@ abstract class BoxInstance(
+         }
+ 
+         Libcore.enableMemoryLimit(calculateLibcoreMemoryLimit(DataStore.memoryLimit))
+-        box.start()
++        box?.start()
      }
  
      @Suppress("EXPERIMENTAL_API_USAGE")
