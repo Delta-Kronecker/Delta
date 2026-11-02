@@ -838,10 +838,10 @@ index 7b0e18605972277715f7855ee40128b820998cc0..96a0f963f81e2cfb8bdeb542afa7d688
  	@golangci-lint fmt
 diff --git a/Makefile.plus b/Makefile.plus
 new file mode 100644
-index 0000000000000000000000000000000000000000..7b9abc16f17b0c816aafeac6258ff8ded33e88b5
+index 0000000000000000000000000000000000000000..365a7c1935a51f39625e02aba8436459115b8610
 --- /dev/null
 +++ b/Makefile.plus
-@@ -0,0 +1,327 @@
+@@ -0,0 +1,322 @@
 +include Makefile
 +
 +ADBLOCK_RUST_REPO ?= https://github.com/brave/adblock-rust
@@ -1164,11 +1164,6 @@ index 0000000000000000000000000000000000000000..7b9abc16f17b0c816aafeac6258ff8de
 +docker-build-adblock:
 +	docker build -f Dockerfile.plus --build-arg ADBLOCK_RUST_COMMIT="$(ADBLOCK_RUST_COMMIT)" -t sing-box-adblock .
 +
-+test:
-+	@go test -v ./... && \
-+	cd test && \
-+	go mod tidy && \
-+	go test -v -tags "$(ADBLOCK_TAGS)" .
 diff --git a/README.md b/README.md
 index 7b1c833a42a363a87cc3767fabfbbb5bab2a0d98..3f8a150a916f0466a90d7be5a0e336f02eaf0bf0 100644
 --- a/README.md

@@ -11,6 +11,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      # Env-based git config is read even inside the temporary HOME that actions/checkout
+      # installs for its own global config, so this silences the
+      # "Using 'master' as the name for the initial branch" hint block.
+      GIT_CONFIG_COUNT: '2'
+      GIT_CONFIG_KEY_0: init.defaultBranch
+      GIT_CONFIG_VALUE_0: main
+      GIT_CONFIG_KEY_1: advice.defaultBranchName
+      GIT_CONFIG_VALUE_1: 'false'
+
     steps:
       - name: Checkout current repository (with patches)
         uses: actions/checkout@v5
@@ -36,7 +46,11 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: '1.27.1'
-          cache-dependency-path: NekoBoxForAndroid/libcore/go.sum
+          # Listing go.mod as well changes the cache key, which forces the module cache
+          # to be (re)populated instead of restoring the empty entry saved earlier.
+          cache-dependency-path: |-
+            NekoBoxForAndroid/libcore/go.mod
+            NekoBoxForAndroid/libcore/go.sum
 
       - name: Setup Android NDK
         run: |
@@ -57,17 +71,14 @@ jobs:
           # Patches in this repo intentionally carry trailing whitespace.
           git config --global apply.whitespace nowarn
 
-          # 1. Apply patch to NekoBoxForAndroid
+          # 1. Apply patch to NekoBoxForAndroid, then the follow-up warning fixes
+          #    (patches/kotlin-warnings.patch: Kotlin/javac diagnostics, Jetifier).
           cd NekoBoxForAndroid
           git apply ../repo/patches/NekoBoxForAndroid.patch
+          git apply ../repo/patches/kotlin-warnings.patch
 
           # Third-party warning fixes for byedpi (see patches/byedpi-warnings.patch).
           cat ../repo/patches/byedpi-warnings.patch >> patches/byedpi/0001-byedpi-jni-api.patch
-
-          # Silence javac's "source 8 is obsolete" warnings from JDK 21 / gomobile.
-          echo "android.javaCompile.suppressSourceTargetDeprecationWarning=true" >> gradle.properties
-          echo "android.sync.suppressAgpWarnings=JAVA_COMPILE_DEPRECATED_SOURCE_TARGET" >> gradle.properties
-          echo "JDK_JAVAC_OPTIONS=-Xlint:-options" >> $GITHUB_ENV
 
           sed -i 's|{sing-box-repo-here}|https://github.com/starifly/sing-box.git|g' buildScript/lib/core/get_source.sh
           sed -i 's|{sing-vmess-repo-here}|https://github.com/starifly/sing-vmess.git|g' buildScript/lib/core/get_source.sh
