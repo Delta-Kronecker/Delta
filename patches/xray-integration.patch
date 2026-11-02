@@ -32,7 +32,7 @@ index 196e7e9..7f7fc70 100644
  }
 \ No newline at end of file
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
-index 43d12a8..093b94f 100644
+index 43d12a8..2d9f66d 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
 @@ -25,6 +25,7 @@ import io.nekohasekai.sagernet.aidl.ISagerNetService
@@ -52,6 +52,19 @@ index 43d12a8..093b94f 100644
          var notification: ServiceNotification? = null
          @Volatile
          internal var connectionRecovery: ConnectionRecoveryQueue? = null
+@@ -668,10 +671,10 @@ class BaseService {
+                         val proxy = data.proxy!!
+                         runBlocking {
+                             proxy.looper?.pauseUpdates {
+-                                proxy.box.selectOutbound(tag)
++                                proxy.box!!.selectOutbound(tag)
+                                 resetCoreNetwork()
+                             } ?: run {
+-                                proxy.box.selectOutbound(tag)
++                                proxy.box!!.selectOutbound(tag)
+                                 resetCoreNetwork()
+                             }
+                         }
 @@ -831,6 +834,11 @@ class BaseService {
                  proxy.looper?.stop()
                  proxy.looper = null
@@ -105,20 +118,20 @@ index 43d12a8..093b94f 100644
                  },
                  recover = { reconnect, reset, cause ->
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
-index e24d5e7..dcb2e36 100644
+index e24d5e7..62597eb 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
-@@ -11,7 +11,8 @@ import io.nekohasekai.sagernet.database.ProfileManager
+@@ -11,7 +11,9 @@ import io.nekohasekai.sagernet.database.ProfileManager
  import io.nekohasekai.sagernet.database.ProxyEntity
  import io.nekohasekai.sagernet.fmt.ConfigBuildResult
  import io.nekohasekai.sagernet.fmt.buildConfig
--import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 +import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
+ import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 +import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
  import io.nekohasekai.sagernet.fmt.hysteria.buildHysteria1Config
  import io.nekohasekai.sagernet.fmt.masque.MasqueBean
  import io.nekohasekai.sagernet.fmt.masque.applyConfigJson
-@@ -33,10 +34,10 @@ internal fun ConfigBuildResult.normalizeConfig() =
+@@ -33,10 +35,10 @@ internal fun ConfigBuildResult.normalizeConfig() =
      }
  
  abstract class BoxInstance(
@@ -131,7 +144,16 @@ index e24d5e7..dcb2e36 100644
  
      val pluginPath = hashMapOf<String, PluginManager.InitResult>()
      val pluginConfigs = hashMapOf<Int, Pair<Int, String>>()
-@@ -210,7 +211,7 @@ abstract class BoxInstance(
+@@ -47,7 +49,7 @@ abstract class BoxInstance(
+     var configNormalizationViolations: List<String> = emptyList()
+         private set
+ 
+-    fun isInitialized(): Boolean = ::config.isInitialized && ::box.isInitialized
++    open fun isInitialized(): Boolean = ::config.isInitialized && ::box.isInitialized
+ 
+     protected fun initPlugin(name: String): PluginManager.InitResult = pluginPath.getOrPut(name) { PluginManager.init(name)!! }
+ 
+@@ -210,7 +212,7 @@ abstract class BoxInstance(
          }
  
          Libcore.enableMemoryLimit(calculateLibcoreMemoryLimit(DataStore.memoryLimit))
@@ -140,7 +162,7 @@ index e24d5e7..dcb2e36 100644
      }
  
      @Suppress("EXPERIMENTAL_API_USAGE")
-@@ -237,7 +238,7 @@ abstract class BoxInstance(
+@@ -237,7 +239,7 @@ abstract class BoxInstance(
  
          if (::box.isInitialized) {
              try {
@@ -150,7 +172,7 @@ index e24d5e7..dcb2e36 100644
                  Logs.w(e)
                  throw e
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt
-index 8b6f706..f587467 100644
+index 8b6f706..ab18873 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt
 @@ -1,15 +1,19 @@
@@ -164,7 +186,7 @@ index 8b6f706..f587467 100644
  import io.nekohasekai.sagernet.bg.ServiceNotification
 +import io.nekohasekai.sagernet.database.DataStore
  import io.nekohasekai.sagernet.database.ProxyEntity
-+import io.nekohasekai.sagernet.fmt.TrojanBean
++import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 +import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 +import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
 +import io.nekohasekai.sagernet.fmt.xray.XrayConfigBuilder
@@ -231,7 +253,7 @@ index 8b6f706..f587467 100644
          super.init()
          pluginConfigs.forEach { (_, plugin) ->
              val (_, content) = plugin
-@@ -45,10 +83,22 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
+@@ -45,13 +83,25 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
      }
  
      override suspend fun loadConfig() {
@@ -243,6 +265,7 @@ index 8b6f706..f587467 100644
 +        if (xrayMode) xrayInstance != null else super.isInitialized()
 +
      override fun launch() {
+-        box.setAsMain()
 +        if (xrayMode) {
 +            xrayInstance?.launch()
 +            runOnDefaultDispatcher {
@@ -251,9 +274,13 @@ index 8b6f706..f587467 100644
 +            }
 +            return
 +        }
-         box.setAsMain()
++        box?.setAsMain()
          super.launch() // start box
-         if (!DataStore.enableClashAPI) box.startDashboard(DataStore.dashboardSocketPath)
+-        if (!DataStore.enableClashAPI) box.startDashboard(DataStore.dashboardSocketPath)
++        if (!DataStore.enableClashAPI) box?.startDashboard(DataStore.dashboardSocketPath)
+         runOnDefaultDispatcher {
+             looper = service?.let { TrafficLooper(it.data, this) }
+             looper?.start()
 @@ -59,6 +109,16 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
      }
  
@@ -277,15 +304,29 @@ index 8b6f706..f587467 100644
  }
 +"
 \ No newline at end of file
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt
+index 33bbba0..9ec27a1 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt
+@@ -274,7 +274,7 @@ class TrafficLooper(
+                     if (proxy.config.selectorGroupId >= 0L) {
+                         selectMainLocked(proxy.config.mainEntId)
+                     }
+-                    trafficUpdater = TrafficUpdater(proxy.box, idMap.values.toList())
++                    trafficUpdater = TrafficUpdater(proxy.box!!, idMap.values.toList())
+                     proxy.box.setV2rayStats(tags.joinToString("\n"))
+                 }
+ 
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/XrayInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/XrayInstance.kt
 new file mode 100644
-index 0000000..441504b
+index 0000000..50ce263
 --- /dev/null
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/XrayInstance.kt
 @@ -0,0 +1,47 @@
 +package io.nekohasekai.sagernet.bg.proto
 +
 +import io.nekohasekai.sagernet.SagerNet
++import io.nekohasekai.sagernet.bg.AbstractInstance
 +import io.nekohasekai.sagernet.database.DataStore
 +import io.nekohasekai.sagernet.database.ProxyEntity
 +import io.nekohasekai.sagernet.ktx.Logs
@@ -329,7 +370,6 @@ index 0000000..441504b
 +
 +    override fun close(timeoutMillis: Long) = close()
 +}
-+"
 \ No newline at end of file
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/database/DataStore.kt b/app/src/main/java/io/nekohasekai/sagernet/database/DataStore.kt
 index f07ca6a..00bcd96 100644
@@ -346,10 +386,10 @@ index f07ca6a..00bcd96 100644
      var globalUdpFragment by configurationStore.string(Key.GLOBAL_UDP_FRAGMENT) { "" }
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/fmt/xray/XrayConfigBuilder.kt b/app/src/main/java/io/nekohasekai/sagernet/fmt/xray/XrayConfigBuilder.kt
 new file mode 100644
-index 0000000..ab0687f
+index 0000000..d2cabb4
 --- /dev/null
 +++ b/app/src/main/java/io/nekohasekai/sagernet/fmt/xray/XrayConfigBuilder.kt
-@@ -0,0 +1,174 @@
+@@ -0,0 +1,173 @@
 +package io.nekohasekai.sagernet.fmt.xray
 +
 +import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
@@ -523,7 +563,6 @@ index 0000000..ab0687f
 +    private fun String.listByLineOrComma(): List<String> =
 +        this.split(Regex("[,\\n]")).map { it.trim() }.filter { it.isNotEmpty() }
 +}
-+"
 \ No newline at end of file
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/ui/compose/GlobalSettingsScreen.kt b/app/src/main/java/io/nekohasekai/sagernet/ui/compose/GlobalSettingsScreen.kt
 index ccc0890..fafdb6c 100644
