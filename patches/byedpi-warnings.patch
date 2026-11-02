@@ -1,0 +1,38 @@
+diff --git a/mpool.c b/mpool.c
+index 9c22017..5777b3e 100644
+--- a/mpool.c
++++ b/mpool.c
+@@ -190,7 +190,7 @@ void load_cache(struct mphdr *hdr, FILE *in, struct desync_params *dp)
+         
+         int bitlen;
+         uint16_t port;
+-        time_t cache_time;
++        intmax_t cache_time;
+         
+         int c = fscanf(in, "0 %39s %d %hu %jd %255s\n", 
+             addr_str, &bitlen, &port, &cache_time, host);
+@@ -229,7 +229,7 @@ void load_cache(struct mphdr *hdr, FILE *in, struct desync_params *dp)
+             free(data);
+             return;
+         }
+-        e->time = cache_time;
++        e->time = (time_t)cache_time;
+         e->extra_len = strlen(host);
+         e->dp = dp;
+         
+diff --git a/packets.c b/packets.c
+index 6ed6d8e..a4c9381 100644
+--- a/packets.c
++++ b/packets.c
+@@ -45,7 +45,11 @@ char tls_data[517] = {
+     "\x4b\xfb\x0e\x00\x15\x00\xac\x00\x00\x00\x00\x00\x00"
+ };
+ 
++#if !defined(__clang__)
+ char http_data[43] __attribute__((nonstring)) = {
++#else
++char http_data[43] = {
++#endif
+     "GET / HTTP/1.1\r\n"
+     "Host: www.wikipedia.org\r\n\r\n"
+ };

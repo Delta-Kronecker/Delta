@@ -13,12 +13,12 @@ jobs:
 
     steps:
       - name: Checkout current repository (with patches)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: repo
 
       - name: Checkout NekoBoxForAndroid
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: starifly/NekoBoxForAndroid
           ref: 5bb4786de6864c039a889f71db54cc914ce46e15
@@ -26,15 +26,17 @@ jobs:
           submodules: recursive
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
 
+      # libcore/init.sh forces GOTOOLCHAIN=go1.27.1; match it here so Go does not self-download.
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.26.5'
+          go-version: '1.27.1'
+          cache-dependency-path: NekoBoxForAndroid/libcore/go.sum
 
       - name: Setup Android NDK
         run: |
@@ -48,9 +50,20 @@ jobs:
 
       - name: Apply Patches & Setup Sibling Repositories
         run: |
+          # Patches in this repo intentionally carry trailing whitespace.
+          git config --global apply.whitespace nowarn
+
           # 1. Apply patch to NekoBoxForAndroid
           cd NekoBoxForAndroid
           git apply ../repo/patches/NekoBoxForAndroid.patch
+
+          # Third-party warning fixes for byedpi (see patches/byedpi-warnings.patch).
+          cat ../repo/patches/byedpi-warnings.patch >> patches/byedpi/0001-byedpi-jni-api.patch
+
+          # Silence javac's "source 8 is obsolete" warnings from JDK 21 / gomobile.
+          echo "android.javaCompile.suppressSourceTargetDeprecationWarning=true" >> gradle.properties
+          echo "android.sync.suppressAgpWarnings=JAVA_COMPILE_DEPRECATED_SOURCE_TARGET" >> gradle.properties
+          echo "JDK_JAVAC_OPTIONS=-Xlint:-options" >> $GITHUB_ENV
 
           sed -i 's|{sing-box-repo-here}|https://github.com/starifly/sing-box.git|g' buildScript/lib/core/get_source.sh
           sed -i 's|{sing-vmess-repo-here}|https://github.com/starifly/sing-vmess.git|g' buildScript/lib/core/get_source.sh
@@ -88,6 +101,9 @@ jobs:
             cd sing-box
             git fetch origin 7054cac5124465ffdb145870d7c01885566711b1
             git checkout FETCH_HEAD
+            # The fork carries no upstream tags, so `git describe` fails and the core
+            # version becomes "unknown". Pull tags from upstream to resolve it.
+            git fetch --tags https://github.com/SagerNet/sing-box
             git apply ../repo/patches/sing-box.patch
           )
 
@@ -133,21 +149,21 @@ jobs:
           ./gradlew assembleOssDebug
 
       - name: Upload APK (arm64)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: NekoBox-arm64-v8a
           path: NekoBoxForAndroid/app/build/outputs/apk/**/*arm64-v8a*.apk
           if-no-files-found: error
 
       - name: Upload APK (armv7)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: NekoBox-armeabi-v7a
           path: NekoBoxForAndroid/app/build/outputs/apk/**/*armeabi-v7a*.apk
           if-no-files-found: error
 
       - name: Upload APK (universal)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: NekoBox-universal
           path: NekoBoxForAndroid/app/build/outputs/apk/**/*universal*.apk
