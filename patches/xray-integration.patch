@@ -12,10 +12,10 @@ index 36fe9e6..a1b6688 100644
      const val OVERLOAD_WATCHDOG = "overloadWatchdog"
      const val MEMORY_LIMIT = "memoryLimit"
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/AbstractInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/AbstractInstance.kt
-index 196e7e9..7f7fc70 100644
+index 196e7e9..1633522 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/AbstractInstance.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/AbstractInstance.kt
-@@ -1,9 +1,14 @@
+@@ -1,9 +1,16 @@
  package io.nekohasekai.sagernet.bg
  
 +import io.nekohasekai.sagernet.database.ProxyEntity
@@ -27,12 +27,15 @@ index 196e7e9..7f7fc70 100644
 +
      fun launch()
  
+-}
+\ No newline at end of file
 +    fun isInitialized(): Boolean
 +
- }
-\ No newline at end of file
++    fun close(timeoutMillis: Long) = close()
++
++}
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
-index 43d12a8..2d9f66d 100644
+index 43d12a8..81d2c43 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
 @@ -25,6 +25,7 @@ import io.nekohasekai.sagernet.aidl.ISagerNetService
@@ -57,11 +60,11 @@ index 43d12a8..2d9f66d 100644
                          runBlocking {
                              proxy.looper?.pauseUpdates {
 -                                proxy.box.selectOutbound(tag)
-+                                proxy.box!!.selectOutbound(tag)
++                                if (!proxy.xrayMode) proxy.box.selectOutbound(tag)
                                  resetCoreNetwork()
                              } ?: run {
 -                                proxy.box.selectOutbound(tag)
-+                                proxy.box!!.selectOutbound(tag)
++                                if (!proxy.xrayMode) proxy.box.selectOutbound(tag)
                                  resetCoreNetwork()
                              }
                          }
@@ -77,30 +80,25 @@ index 43d12a8..2d9f66d 100644
              val profilingShutdown = Libcore.coreProfilingRunning()
              if (profilingShutdown) {
                  runCatching { Libcore.prepareCoreProfilerShutdown() }.onFailure { Logs.w(it) }
-@@ -1069,13 +1077,16 @@ class BaseService {
+@@ -1068,7 +1076,7 @@ class BaseService {
+ 
          fun resetCoreNetwork() {
              val proxy = data.proxy
-             if (proxy != null && proxy.isInitialized()) {
--                runCatching {
--                    proxy.box.resetNetwork()
--                }.onFailure {
--                    Logs.w(it)
--                    Libcore.resetAllConnections(true)
-+                val box = proxy.box
-+                if (box != null) {
-+                    runCatching {
-+                        box.resetNetwork()
-+                    }.onFailure {
-+                        Logs.w(it)
-+                        Libcore.resetAllConnections(true)
-+                    }
-+                    return
+-            if (proxy != null && proxy.isInitialized()) {
++            if (proxy != null && proxy.isInitialized() && !proxy.xrayMode) {
+                 runCatching {
+                     proxy.box.resetNetwork()
+                 }.onFailure {
+@@ -1076,6 +1084,8 @@ class BaseService {
+                     Libcore.resetAllConnections(true)
                  }
--                return
+                 return
++            }
++                }
              }
              Libcore.resetAllConnections(true)
          }
-@@ -1302,6 +1313,7 @@ class BaseService {
+@@ -1302,6 +1312,7 @@ class BaseService {
              }
  
              val proxy = ProxyInstance(profile, this)
@@ -108,30 +106,22 @@ index 43d12a8..2d9f66d 100644
              data.proxy = proxy
              data.connectionRecovery?.close()
              data.connectionRecovery = ConnectionRecoveryQueue(
-@@ -1309,7 +1321,7 @@ class BaseService {
+@@ -1309,7 +1320,9 @@ class BaseService {
                  urlTestRunning = { data.urlTestTracker.isRunning },
                  pause = { idle ->
                      if (data.proxy === proxy && data.state.started) {
 -                        if (idle) proxy.box.sleep() else proxy.box.wake()
-+                        if (idle) proxy.box?.sleep() else proxy.box?.wake()
++                        if (!proxy.xrayMode) {
++                            if (idle) proxy.box.sleep() else proxy.box.wake()
++                        }
                      }
                  },
                  recover = { reconnect, reset, cause ->
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
-index e24d5e7..62597eb 100644
+index e24d5e7..3584b16 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
-@@ -11,7 +11,9 @@ import io.nekohasekai.sagernet.database.ProfileManager
- import io.nekohasekai.sagernet.database.ProxyEntity
- import io.nekohasekai.sagernet.fmt.ConfigBuildResult
- import io.nekohasekai.sagernet.fmt.buildConfig
-+import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
- import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
-+import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
- import io.nekohasekai.sagernet.fmt.hysteria.buildHysteria1Config
- import io.nekohasekai.sagernet.fmt.masque.MasqueBean
- import io.nekohasekai.sagernet.fmt.masque.applyConfigJson
-@@ -33,10 +35,10 @@ internal fun ConfigBuildResult.normalizeConfig() =
+@@ -33,7 +33,7 @@ internal fun ConfigBuildResult.normalizeConfig() =
      }
  
  abstract class BoxInstance(
@@ -139,40 +129,18 @@ index e24d5e7..62597eb 100644
 +    override val profile: ProxyEntity,
  ) : AbstractInstance {
      lateinit var config: ConfigBuildResult
--    lateinit var box: BoxInstance
-+    var box: libcore.BoxInstance? = null
- 
-     val pluginPath = hashMapOf<String, PluginManager.InitResult>()
-     val pluginConfigs = hashMapOf<Int, Pair<Int, String>>()
-@@ -47,7 +49,7 @@ abstract class BoxInstance(
+     lateinit var box: BoxInstance
+@@ -47,7 +47,7 @@ abstract class BoxInstance(
      var configNormalizationViolations: List<String> = emptyList()
          private set
  
 -    fun isInitialized(): Boolean = ::config.isInitialized && ::box.isInitialized
-+    open fun isInitialized(): Boolean = ::config.isInitialized && ::box.isInitialized
++    override fun isInitialized(): Boolean = ::config.isInitialized && ::box.isInitialized
  
      protected fun initPlugin(name: String): PluginManager.InitResult = pluginPath.getOrPut(name) { PluginManager.init(name)!! }
  
-@@ -210,7 +212,7 @@ abstract class BoxInstance(
-         }
- 
-         Libcore.enableMemoryLimit(calculateLibcoreMemoryLimit(DataStore.memoryLimit))
--        box.start()
-+        box?.start()
-     }
- 
-     @Suppress("EXPERIMENTAL_API_USAGE")
-@@ -237,7 +239,7 @@ abstract class BoxInstance(
- 
-         if (::box.isInitialized) {
-             try {
--                box.closeTimeout(timeoutMillis)
-+                box?.closeTimeout(timeoutMillis)
-             } catch (e: Exception) {
-                 Logs.w(e)
-                 throw e
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt
-index 8b6f706..ab18873 100644
+index 8b6f706..e307bd9 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt
 @@ -1,15 +1,19 @@
@@ -219,8 +187,6 @@ index 8b6f706..ab18873 100644
 +    private var xrayConfigFile: File? = null
 +
      override fun buildConfig() {
-         super.buildConfig()
-         lastSelectorGroupId = super.config.selectorGroupId
 +        if (xrayMode) {
 +            val bean = profile.requireBean()
 +            val json = when (bean) {
@@ -233,8 +199,11 @@ index 8b6f706..ab18873 100644
 +            val configFile = File(cacheDir, "xray_" + System.currentTimeMillis() + ".json")
 +            configFile.writeText(json)
 +            xrayConfigFile = configFile
++            return
 +        }
-         //
+         super.buildConfig()
+         lastSelectorGroupId = super.config.selectorGroupId
+-        //
          if (notTmp) Logs.d(config.config)
 -        if (notTmp && BuildConfig.DEBUG) Logs.d(JavaUtil.gson.toJson(config.trafficMap))
 +        if (notTmp && io.nekohasekai.sagernet.BuildConfig.DEBUG) Logs.d(JavaUtil.gson.toJson(config.trafficMap))
@@ -253,7 +222,7 @@ index 8b6f706..ab18873 100644
          super.init()
          pluginConfigs.forEach { (_, plugin) ->
              val (_, content) = plugin
-@@ -45,13 +83,25 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
+@@ -45,10 +83,18 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
      }
  
      override suspend fun loadConfig() {
@@ -265,23 +234,14 @@ index 8b6f706..ab18873 100644
 +        if (xrayMode) xrayInstance != null else super.isInitialized()
 +
      override fun launch() {
--        box.setAsMain()
 +        if (xrayMode) {
 +            xrayInstance?.launch()
-+            runOnDefaultDispatcher {
-+                looper = service?.let { TrafficLooper(it.data, this) }
-+                looper?.start()
-+            }
 +            return
 +        }
-+        box?.setAsMain()
+         box.setAsMain()
          super.launch() // start box
--        if (!DataStore.enableClashAPI) box.startDashboard(DataStore.dashboardSocketPath)
-+        if (!DataStore.enableClashAPI) box?.startDashboard(DataStore.dashboardSocketPath)
-         runOnDefaultDispatcher {
-             looper = service?.let { TrafficLooper(it.data, this) }
-             looper?.start()
-@@ -59,6 +109,16 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
+         if (!DataStore.enableClashAPI) box.startDashboard(DataStore.dashboardSocketPath)
+@@ -59,6 +105,16 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
      }
  
      override fun close(timeoutMillis: Long) {
@@ -298,28 +258,9 @@ index 8b6f706..ab18873 100644
          runBlocking {
              looper?.stop()
              looper = null
-@@ -70,3 +130,4 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
-         close(60_000L)
-     }
- }
-+"
-\ No newline at end of file
-diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt
-index 33bbba0..9ec27a1 100644
---- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt
-+++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt
-@@ -274,7 +274,7 @@ class TrafficLooper(
-                     if (proxy.config.selectorGroupId >= 0L) {
-                         selectMainLocked(proxy.config.mainEntId)
-                     }
--                    trafficUpdater = TrafficUpdater(proxy.box, idMap.values.toList())
-+                    trafficUpdater = TrafficUpdater(proxy.box!!, idMap.values.toList())
-                     proxy.box.setV2rayStats(tags.joinToString("\n"))
-                 }
- 
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/XrayInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/XrayInstance.kt
 new file mode 100644
-index 0000000..50ce263
+index 0000000..8e2a682
 --- /dev/null
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/XrayInstance.kt
 @@ -0,0 +1,47 @@
@@ -370,7 +311,6 @@ index 0000000..50ce263
 +
 +    override fun close(timeoutMillis: Long) = close()
 +}
-\ No newline at end of file
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/database/DataStore.kt b/app/src/main/java/io/nekohasekai/sagernet/database/DataStore.kt
 index f07ca6a..00bcd96 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/database/DataStore.kt
