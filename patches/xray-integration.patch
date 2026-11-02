@@ -346,15 +346,15 @@ index f07ca6a..00bcd96 100644
      var globalUdpFragment by configurationStore.string(Key.GLOBAL_UDP_FRAGMENT) { "" }
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/fmt/xray/XrayConfigBuilder.kt b/app/src/main/java/io/nekohasekai/sagernet/fmt/xray/XrayConfigBuilder.kt
 new file mode 100644
-index 0000000..895e712
+index 0000000..ab0687f
 --- /dev/null
 +++ b/app/src/main/java/io/nekohasekai/sagernet/fmt/xray/XrayConfigBuilder.kt
-@@ -0,0 +1,173 @@
+@@ -0,0 +1,174 @@
 +package io.nekohasekai.sagernet.fmt.xray
 +
-+import com.google.gson.JsonObject
-+import io.nekohasekai.sagernet.fmt.StandardV2RayBean
-+import io.nekohasekai.sagernet.fmt.TrojanBean
++import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
++import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
++import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
 +import io.nekohasekai.sagernet.fmt.v2ray.isTLS
 +import io.nekohasekai.sagernet.ktx.Logs
 +import org.json.JSONArray
@@ -397,7 +397,7 @@ index 0000000..895e712
 +        if (bean.isTLS()) {
 +            val tls = JSONObject()
 +            tls.put("serverName", bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress)
-+            if (bean.allowInsecure) tls.put("allowInsecure", true)
++            if (bean.allowInsecure == true) tls.put("allowInsecure", true)
 +            if (bean.alpn.isNotBlank()) tls.put("alpn", bean.alpn.listByLineOrComma())
 +            if (bean.realityPubKey.isNotBlank()) {
 +                val reality = JSONObject()
@@ -484,7 +484,7 @@ index 0000000..895e712
 +
 +        val tls = JSONObject()
 +        tls.put("serverName", bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress)
-+        if (bean.allowInsecure) tls.put("allowInsecure", true)
++        if (bean.allowInsecure == true) tls.put("allowInsecure", true)
 +        if (bean.alpn.isNotBlank()) tls.put("alpn", bean.alpn.listByLineOrComma())
 +        stream.put("tlsSettings", tls)
 +
@@ -523,6 +523,8 @@ index 0000000..895e712
 +    private fun String.listByLineOrComma(): List<String> =
 +        this.split(Regex("[,\\n]")).map { it.trim() }.filter { it.isNotEmpty() }
 +}
++"
+\ No newline at end of file
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/ui/compose/GlobalSettingsScreen.kt b/app/src/main/java/io/nekohasekai/sagernet/ui/compose/GlobalSettingsScreen.kt
 index ccc0890..fafdb6c 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/ui/compose/GlobalSettingsScreen.kt
