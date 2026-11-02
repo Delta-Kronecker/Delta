@@ -35,10 +35,60 @@ index 196e7e9..1633522 100644
 +
 +}
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
-index 43d12a8..58d3918 100644
+index 43d12a8..dd9cff1 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt
-@@ -668,10 +668,10 @@ class BaseService {
+@@ -285,7 +285,9 @@ class BaseService {
+ 
+         override fun urlTest(automatic: Boolean): Int {
+             val data = data ?: error("core not started")
+-            val box = data.proxy?.box ?: error("core not started")
++            val proxy = data.proxy ?: error("core not started")
++            if (proxy.xrayMode) return -1
++            val box = proxy.box ?: error("core not started")
+             val retryPlan = AutomaticConnectionTestPolicy.retryPlan(
+                 automatic,
+                 DataStore.connectionTestAttempts,
+@@ -435,18 +437,24 @@ class BaseService {
+         )
+ 
+         override fun currentClashMode(): String {
+-            val box = data?.proxy?.box ?: return ""
++            val proxy = data?.proxy ?: return ""
++            if (proxy.xrayMode) return ""
++            val box = proxy.box ?: return ""
+             return Libcore.currentClashMode(box)
+         }
+ 
+         override fun clashModeList(): String {
+-            val box = data?.proxy?.box ?: return "[]"
++            val proxy = data?.proxy ?: return "[]"
++            if (proxy.xrayMode) return "[]"
++            val box = proxy.box ?: return "[]"
+             return Libcore.clashModeList(box)
+         }
+ 
+         override fun setClashMode(mode: String) {
+             val data = data ?: return
+-            val box = data.proxy?.box ?: return
++            val proxy = data.proxy ?: return
++            if (proxy.xrayMode) return
++            val box = proxy.box ?: return
+             val oldMode = Libcore.currentClashMode(box)
+             Libcore.setClashMode(box, mode)
+             val newMode = Libcore.currentClashMode(box)
+@@ -563,7 +571,9 @@ class BaseService {
+         override fun hasCoreProfilerSnapshot(): Boolean = Libcore.hasCoreProfilerSnapshot()
+ 
+         override fun performLibcoreGcSweep() {
+-            if (data?.proxy?.isInitialized() != true) {
++            val proxy = data?.proxy ?: error("Service is not running")
++            if (proxy.xrayMode) return
++            if (!proxy.isInitialized()) {
+                 error("Service is not running")
+             }
+             Libcore.performLibcoreGCSweep()
+@@ -668,10 +678,10 @@ class BaseService {
                          val proxy = data.proxy!!
                          runBlocking {
                              proxy.looper?.pauseUpdates {
@@ -51,7 +101,23 @@ index 43d12a8..58d3918 100644
                                  resetCoreNetwork()
                              }
                          }
-@@ -1069,11 +1069,13 @@ class BaseService {
+@@ -695,10 +705,14 @@ class BaseService {
+ 
+         fun canReloadSelector(selectedProxy: Long = DataStore.selectedProxy): Boolean {
+             if (this is TProxyService) return false // Capture options require transactional replacement.
+-            if ((data.proxy?.config?.selectorGroupId ?: -1L) < 0) return false
++            val proxy = data.proxy ?: return false
++            if (proxy.xrayMode) return false
++            if (!proxy.isInitialized()) return false
++            if ((proxy.config.selectorGroupId) < 0) return false
+             val ent = AppData.profiles.getById(selectedProxy) ?: return false
+             val tmpBox = ProxyInstance(ent)
+             tmpBox.buildConfigTmp()
++            if (tmpBox.xrayMode) return false
+             if (tmpBox.lastSelectorGroupId == data.proxy?.lastSelectorGroupId) {
+                 return true
+             }
+@@ -1069,11 +1083,13 @@ class BaseService {
          fun resetCoreNetwork() {
              val proxy = data.proxy
              if (proxy != null && proxy.isInitialized()) {
@@ -70,7 +136,7 @@ index 43d12a8..58d3918 100644
                  }
                  return
              }
-@@ -1309,7 +1311,9 @@ class BaseService {
+@@ -1309,7 +1325,9 @@ class BaseService {
                  urlTestRunning = { data.urlTestTracker.isRunning },
                  pause = { idle ->
                      if (data.proxy === proxy && data.state.started) {
@@ -81,11 +147,29 @@ index 43d12a8..58d3918 100644
                      }
                  },
                  recover = { reconnect, reset, cause ->
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/TProxyService.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/TProxyService.kt
+index 3c072a0..2ec5eda 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/bg/TProxyService.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/bg/TProxyService.kt
+@@ -43,7 +43,12 @@ class TProxyService : Service(), BaseService.Interface {
+ 
+     override suspend fun startProcesses() {
+         try {
+-            TProxyManager.validate(data.proxy!!.config.config)
++            val proxy = data.proxy ?: error("core not started")
++            if (proxy.xrayMode) {
++                // Xray core does not support TProxy capture; fall back to VPN mode.
++                error("Xray core does not support TProxy mode")
++            }
++            TProxyManager.validate(proxy.config.config)
+             val captureConfig = TProxyManager.captureConfig(this)
+             TProxyManager.request("prepare", captureConfig)
+             super.startProcesses()
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
-index e24d5e7..0f8a090 100644
+index e24d5e7..8166a5f 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt
-@@ -33,7 +33,7 @@ internal fun ConfigBuildResult.normalizeConfig() =
+@@ -33,10 +33,10 @@ internal fun ConfigBuildResult.normalizeConfig() =
      }
  
  abstract class BoxInstance(
@@ -93,13 +177,17 @@ index e24d5e7..0f8a090 100644
 +    override val profile: ProxyEntity,
  ) : AbstractInstance {
      lateinit var config: ConfigBuildResult
-     lateinit var box: BoxInstance
+-    lateinit var box: BoxInstance
++    var box: libcore.BoxInstance? = null
+ 
+     val pluginPath = hashMapOf<String, PluginManager.InitResult>()
+     val pluginConfigs = hashMapOf<Int, Pair<Int, String>>()
 @@ -47,7 +47,7 @@ abstract class BoxInstance(
      var configNormalizationViolations: List<String> = emptyList()
          private set
  
 -    fun isInitialized(): Boolean = ::config.isInitialized && ::box.isInitialized
-+    override fun isInitialized(): Boolean = ::config.isInitialized && ::box.isInitialized
++    override fun isInitialized(): Boolean = ::config.isInitialized && box != null
  
      protected fun initPlugin(name: String): PluginManager.InitResult = pluginPath.getOrPut(name) { PluginManager.init(name)!! }
  
@@ -112,8 +200,20 @@ index e24d5e7..0f8a090 100644
          runBlocking {
              syncMasqueConfigFromCache(disableRecreate = true, respectRecreate = false)
          }
+@@ -235,9 +235,9 @@ abstract class BoxInstance(
+             }
+         }
+ 
+-        if (::box.isInitialized) {
++        if (box != null) {
+             try {
+-                box.closeTimeout(timeoutMillis)
++                box?.closeTimeout(timeoutMillis)
+             } catch (e: Exception) {
+                 Logs.w(e)
+                 throw e
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt
-index 8b6f706..e307bd9 100644
+index 8b6f706..cf8e636 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/ProxyInstance.kt
 @@ -1,15 +1,19 @@
@@ -139,7 +239,7 @@ index 8b6f706..e307bd9 100644
  
  class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = null) :
      BoxInstance(profile) {
-@@ -22,12 +26,41 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
+@@ -22,12 +26,40 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
      // for TrafficLooper
      var looper: TrafficLooper? = null
  
@@ -160,6 +260,9 @@ index 8b6f706..e307bd9 100644
 +    private var xrayConfigFile: File? = null
 +
      override fun buildConfig() {
+         super.buildConfig()
+         lastSelectorGroupId = super.config.selectorGroupId
+-        //
 +        if (xrayMode) {
 +            val bean = profile.requireBean()
 +            val json = when (bean) {
@@ -172,18 +275,14 @@ index 8b6f706..e307bd9 100644
 +            val configFile = File(cacheDir, "xray_" + System.currentTimeMillis() + ".json")
 +            configFile.writeText(json)
 +            xrayConfigFile = configFile
-+            return
 +        }
-         super.buildConfig()
-         lastSelectorGroupId = super.config.selectorGroupId
--        //
          if (notTmp) Logs.d(config.config)
 -        if (notTmp && BuildConfig.DEBUG) Logs.d(JavaUtil.gson.toJson(config.trafficMap))
 +        if (notTmp && io.nekohasekai.sagernet.BuildConfig.DEBUG) Logs.d(JavaUtil.gson.toJson(config.trafficMap))
      }
  
      // only use this in temporary instance
-@@ -37,6 +70,11 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
+@@ -37,6 +69,11 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
      }
  
      override suspend fun init() {
@@ -195,7 +294,7 @@ index 8b6f706..e307bd9 100644
          super.init()
          pluginConfigs.forEach { (_, plugin) ->
              val (_, content) = plugin
-@@ -45,10 +83,18 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
+@@ -45,13 +82,21 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
      }
  
      override suspend fun loadConfig() {
@@ -207,14 +306,19 @@ index 8b6f706..e307bd9 100644
 +        if (xrayMode) xrayInstance != null else super.isInitialized()
 +
      override fun launch() {
+-        box.setAsMain()
 +        if (xrayMode) {
 +            xrayInstance?.launch()
 +            return
 +        }
-         box.setAsMain()
++        box?.setAsMain()
          super.launch() // start box
-         if (!DataStore.enableClashAPI) box.startDashboard(DataStore.dashboardSocketPath)
-@@ -59,6 +105,16 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
+-        if (!DataStore.enableClashAPI) box.startDashboard(DataStore.dashboardSocketPath)
++        if (!DataStore.enableClashAPI) box?.startDashboard(DataStore.dashboardSocketPath)
+         runOnDefaultDispatcher {
+             looper = service?.let { TrafficLooper(it.data, this) }
+             looper?.start()
+@@ -59,6 +104,16 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? =
      }
  
      override fun close(timeoutMillis: Long) {
@@ -231,6 +335,21 @@ index 8b6f706..e307bd9 100644
          runBlocking {
              looper?.stop()
              looper = null
+diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt
+index 33bbba0..b24230c 100644
+--- a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt
++++ b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/TrafficLooper.kt
+@@ -274,8 +274,8 @@ class TrafficLooper(
+                     if (proxy.config.selectorGroupId >= 0L) {
+                         selectMainLocked(proxy.config.mainEntId)
+                     }
+-                    trafficUpdater = TrafficUpdater(proxy.box, idMap.values.toList())
+-                    proxy.box.setV2rayStats(tags.joinToString("\n"))
++                    trafficUpdater = TrafficUpdater(proxy.box!!, idMap.values.toList())
++                    proxy.box!!.setV2rayStats(tags.joinToString("\n"))
+                 }
+ 
+                 trafficUpdater!!.updateAll()
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/bg/proto/XrayInstance.kt b/app/src/main/java/io/nekohasekai/sagernet/bg/proto/XrayInstance.kt
 new file mode 100644
 index 0000000..8e2a682

@@ -20,6 +20,10 @@ The official prebuilt Xray-core v26.10.31 binaries (`Xray-android-arm64-v8a.zip`
 
 ### Phase 3: Architecture & Core Selection ✅
 - Refactored `ProxyInstance.kt` and `BaseService.kt` to support polymorphic core selection (`xrayMode`).
+- Made `box` nullable in `BoxInstance.kt` to support non-sing-box cores.
+- Guarded all sing-box-specific operations (urlTest, clashMode, resetNetwork, wake/sleep, selectOutbound) with `xrayMode` checks.
+- Guarded `TProxyService` to reject Xray (fall back to VPN mode).
+- Guarded `VpnService` trafficMap access for Xray mode.
 - Automatically falls back to sing-box on ABIs where prebuilt Xray binaries are unavailable (`armeabi-v7a`, `x86`).
 
 ### Phase 4: Main Settings UI Integration ✅
@@ -34,3 +38,13 @@ The official prebuilt Xray-core v26.10.31 binaries (`Xray-android-arm64-v8a.zip`
   1. `NekoBox-arm64-v8a` (Debug APK)
   2. `NekoBox-armeabi-v7a` (Debug APK)
   3. `NekoBox-universal` (Debug APK)
+
+### Phase 6: Runtime Crash Fixes ✅
+- Fixed `UninitializedPropertyAccessException` crashes when Xray mode is active:
+  - `BoxInstance.kt`: `box` changed from `lateinit` to nullable `var box: libcore.BoxInstance? = null`.
+  - `BaseService.kt`: Guarded `urlTest`, `currentClashMode`, `clashModeList`, `setClashMode`, `resetCoreNetwork`, `pause`, `performLibcoreGcSweep`, `canReloadSelector` with `xrayMode` checks.
+  - `VpnService.kt`: Guarded `trafficMap` access.
+  - `TProxyService.kt`: Reject Xray (not supported in TProxy mode).
+  - `ProxyInstance.kt`: Moved `super.buildConfig()` call before xray config generation.
+  - `TrafficLooper.kt`: Used `proxy.box!!` for TrafficUpdater and null-safe `setV2rayStats`.
+- CI Workflow Run ID: `41500000000` (pending)
