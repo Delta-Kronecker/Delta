@@ -103,6 +103,8 @@ jobs:
             curl -sL https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-android-amd64.zip -o x.zip && \
             unzip -o x.zip xray && mv xray libxray.so && rm x.zip )
 
+          cd ..
+
           # 2. Clone sibling repos and apply patches (subshells so a failure never leaves us in the wrong dir)
           (
             git clone https://github.com/starifly/libneko libneko
