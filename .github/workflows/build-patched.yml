@@ -76,6 +76,7 @@ jobs:
           cd NekoBoxForAndroid
           git apply ../repo/patches/NekoBoxForAndroid.patch
           git apply ../repo/patches/kotlin-warnings.patch
+          git apply ../repo/patches/xray-integration.patch
 
           # Third-party warning fixes for byedpi (see patches/byedpi-warnings.patch).
           cat ../repo/patches/byedpi-warnings.patch >> patches/byedpi/0001-byedpi-jni-api.patch
@@ -92,7 +93,15 @@ jobs:
           export COMMIT_BYEDPI="ba532298de7b28cfe854aea83d061369d13ca290"
           EOF
 
-          cd ..
+          # 3. (Xray) Download prebuilt Xray-core binaries (only arm64-v8a and x86_64 are published).
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          mkdir -p app/src/main/jniLibs/x86_64
+          ( cd app/src/main/jniLibs/arm64-v8a && \
+            curl -sL https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-android-arm64-v8a.zip -o x.zip && \
+            unzip -o x.zip xray && mv xray libxray.so && rm x.zip )
+          ( cd app/src/main/jniLibs/x86_64 && \
+            curl -sL https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-android-amd64.zip -o x.zip && \
+            unzip -o x.zip xray && mv xray libxray.so && rm x.zip )
 
           # 2. Clone sibling repos and apply patches (subshells so a failure never leaves us in the wrong dir)
           (
