@@ -9,7 +9,7 @@ index 8bfc0da..e439244 100644
  
  import android.app.Activity
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/AppIconManager.kt b/app/src/main/java/io/nekohasekai/sagernet/AppIconManager.kt
-index 02d728d..e22303d 100644
+index 02d728d..9cea188 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/AppIconManager.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/AppIconManager.kt
 @@ -13,8 +13,8 @@ import androidx.appcompat.content.res.AppCompatResources
@@ -18,8 +18,8 @@ index 02d728d..e22303d 100644
      val aliasClassName: String,
 -    @StringRes val titleRes: Int,
 -    @DrawableRes val iconRes: Int,
-+    @param:@StringRes val titleRes: Int,
-+    @param:@DrawableRes val iconRes: Int,
++    @param:StringRes val titleRes: Int,
++    @param:DrawableRes val iconRes: Int,
  ) {
      NEKOBOX_PLUS(
          "io.nekohasekai.sagernet.launcher.NekoBoxPlus",
@@ -497,7 +497,7 @@ index ba453c2..f4d7894 100644
  
  import android.view.KeyEvent
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/ui/compose/ProfileCard.kt b/app/src/main/java/io/nekohasekai/sagernet/ui/compose/ProfileCard.kt
-index 15e789c..1c14b15 100644
+index 15e789c..3fd65f5 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/ui/compose/ProfileCard.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/ui/compose/ProfileCard.kt
 @@ -92,8 +92,8 @@ data class ProfileCardModel(
@@ -506,8 +506,8 @@ index 15e789c..1c14b15 100644
      val status: String,
 -    @ColorInt val typeColor: Int,
 -    @ColorInt val statusColor: Int,
-+    @param:@ColorInt val typeColor: Int,
-+    @param:@ColorInt val statusColor: Int,
++    @param:ColorInt val typeColor: Int,
++    @param:ColorInt val statusColor: Int,
      val selected: Boolean,
      val insecure: Boolean,
      val borders: Boolean,
@@ -532,7 +532,7 @@ index a09d74a..2521e53 100644
  
  import android.view.KeyEvent
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/ui/toolbar/ProfileToolbarActionCatalog.kt b/app/src/main/java/io/nekohasekai/sagernet/ui/toolbar/ProfileToolbarActionCatalog.kt
-index ae21132..06842aa 100644
+index ae21132..a797914 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/ui/toolbar/ProfileToolbarActionCatalog.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/ui/toolbar/ProfileToolbarActionCatalog.kt
 @@ -13,8 +13,8 @@ enum class ProfileToolbarActionKind {
@@ -541,8 +541,8 @@ index ae21132..06842aa 100644
      val id: ProfileToolbarActionId,
 -    @StringRes val titleRes: Int,
 -    @DrawableRes val iconRes: Int,
-+    @param:@StringRes val titleRes: Int,
-+    @param:@DrawableRes val iconRes: Int,
++    @param:StringRes val titleRes: Int,
++    @param:DrawableRes val iconRes: Int,
      val kind: ProfileToolbarActionKind = ProfileToolbarActionKind.ACTION,
  )
  
@@ -576,7 +576,7 @@ index 2aa93fa..2c04bf1 100644
              }
              bufferedReader.close()
 diff --git a/app/src/main/java/io/nekohasekai/sagernet/utils/CustomTheme.kt b/app/src/main/java/io/nekohasekai/sagernet/utils/CustomTheme.kt
-index 81580dd..0027e03 100644
+index 81580dd..5b82aad 100644
 --- a/app/src/main/java/io/nekohasekai/sagernet/utils/CustomTheme.kt
 +++ b/app/src/main/java/io/nekohasekai/sagernet/utils/CustomTheme.kt
 @@ -25,10 +25,10 @@ object CustomTheme {
@@ -587,10 +587,10 @@ index 81580dd..0027e03 100644
 -        @StringRes val descriptionRes: Int,
 -        @AttrRes val attr: Int,
 -        @ColorRes val colorRes: Int,
-+        @param:@StringRes val titleRes: Int,
-+        @param:@StringRes val descriptionRes: Int,
-+        @param:@AttrRes val attr: Int,
-+        @param:@ColorRes val colorRes: Int,
++        @param:StringRes val titleRes: Int,
++        @param:StringRes val descriptionRes: Int,
++        @param:AttrRes val attr: Int,
++        @param:ColorRes val colorRes: Int,
      )
  
      data class Palette(val colors: MutableMap<String, Int>) {
